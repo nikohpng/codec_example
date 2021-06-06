@@ -1,6 +1,8 @@
 # codec_example
 codec_example是实现一个简单且可运行的视频的编解码例子集合
 
+codec_example is a collection of simple and runnable video codec examples
+
 ## Usage
 
 里面实现的所有内容都是在Linux环境下实现，Win环境未做任何测试。
