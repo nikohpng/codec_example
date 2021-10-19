@@ -14,8 +14,10 @@ int main(int argc, char *argv[]) {
     AVCodecContext *pCodecContext = NULL;
 
     AVFrame *pFrame = NULL;
+    uint8_t *pictureBuf = NULL;
 
-    char *outUrl = "./lena.flv";
+    char *outUrl = "./out/lena.flv";
+    FILE *inFile = fopen("./assets/lena_256x256_yuv420p.yuv", "rb+");
     int bufferSize = 0;
 
     pOutFormatCtx = avformat_alloc_context();
@@ -32,7 +34,7 @@ int main(int argc, char *argv[]) {
         printf("create stream error!");
         return -1;
     }
-    pCodec = avcodec_find_encoder(pOutFormatCtx->video_codec);
+    pCodec = avcodec_find_encoder(pOutputFmt->video_codec);
     if(!pCodec) {
         printf("create codec error!");
         return -1;
@@ -53,9 +55,10 @@ int main(int argc, char *argv[]) {
     if (pCodecContext->codec_id == AV_CODEC_ID_H264) {
         pCodecContext->qmin = 10;
         pCodecContext->qmax = 51;
+        pCodecContext->max_b_frames = 3;
     }
 
-    pCodecContext->max_b_frames = 3;
+    
 
 
     if (avcodec_open2(pCodecContext, pCodec, NULL) < 0) {
@@ -72,4 +75,54 @@ int main(int argc, char *argv[]) {
     pFrame->format = pCodecContext->pix_fmt;
 
     bufferSize = av_image_get_buffer_size(pCodecContext->pix_fmt, pCodecContext->width, pCodecContext->height, 1);
+    pictureBuf = (uint8_t*) malloc(bufferSize);
+    av_image_fill_arrays(pFrame->data, pFrame->linesize, pictureBuf, pCodecContext->pix_fmt, pCodecContext->width, pCodecContext->height, 1);
+
+    pOutFormatCtx->streams[0]->codecpar->codec_type = AVMEDIA_TYPE_VIDEO;
+    pOutFormatCtx->streams[0]->codecpar->codec_id = pCodecContext->codec_id;
+    pOutFormatCtx->streams[0]->codecpar->width = pCodecContext->width;
+    pOutFormatCtx->streams[0]->codecpar->height = pCodecContext->height;
+
+    avformat_write_header(pOutFormatCtx, NULL);
+
+    AVPacket packet;
+    int ySize = pCodecContext->width * pCodecContext->height;
+    av_new_packet(&packet,ySize);
+
+    int i = 0;
+    for( i = 0; i < 1; i++) {
+        
+        if (fread(pictureBuf, 1, ySize * 3 / 2, inFile) <= 0) {
+            printf("read picture raw error!");
+            return -1;
+        } else if (feof(inFile)) {
+            break;
+        }
+        pFrame->data[0] = pictureBuf;
+        pFrame->data[1] = pictureBuf + ySize;
+        pFrame->data[2] = pictureBuf + ySize * 5 / 4;
+
+        pFrame->pts = i;
+
+        avcodec_send_frame(pCodecContext, pFrame);
+
+        int ret = avcodec_receive_packet(pCodecContext, &packet);
+
+        if(ret == 0) {
+            printf("Succeed to encode frame");
+           
+            packet.stream_index = pOutStream->index;
+
+            av_write_frame(pOutFormatCtx, &packet);
+        }
+
+        av_packet_unref(&packet);
+        av_write_trailer(pOutFormatCtx);
+        avcodec_free_context(&pCodecContext);
+        av_free(pFrame);
+        av_free(pictureBuf);
+        avio_close(pOutFormatCtx->pb);
+        avformat_free_context(pOutFormatCtx);
+        fclose(inFile);
+    }
 }
