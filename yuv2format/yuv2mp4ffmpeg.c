@@ -15,8 +15,8 @@ int main() {
     uint8_t *pictureBuf = NULL;
     int size = 0;
 
-    FILE *inFile = fopen("./lena_256x256_yuv420p.yuv", "rb+");
-    char *outPath = "./lena.mp4";
+    FILE *inFile = fopen("./assets/lena_256x256_yuv420p.yuv", "rb+");
+    char *outPath = "./out/lena.mp4";
     
     formatCtx = avformat_alloc_context();
 
